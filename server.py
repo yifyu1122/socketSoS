@@ -99,16 +99,15 @@ class GameServer:
                 if not zombie.get('stop', False) : #如果不是stop 則繼續移動
                     zombie['x'] -= self.update_rate
                 # 檢查是否碰到植物
+                zombie['stop'] = False  
+
                 for plant in self.game_state['plants']:
                     if (plant.get('hp', 0) > 0 and 
                         abs(zombie['x'] - plant['x']) < 40 and 
                         zombie['y'] == plant['y']):
                         zombie['stop'] = True
                         plant['hp'] -= 1  # 殭屍攻擊植物
-                        break
-                    else: 
-                        zombie['stop'] = False
-                        break
+                        break  # 找到要啃的植物就退出
                 if zombie['x'] < -80:
                     zombie['live'] = False
 
