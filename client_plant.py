@@ -44,7 +44,7 @@ def send_plant_placement(x, y, plant_type):
             'position': (x, y),
             'plant_type': plant_type
         }
-        client_socket.sendall(json.dumps(message).encode('utf-8'))
+        client_socket.sendall((json.dumps(message) + '\n').encode('utf-8'))
     except (ConnectionAbortedError, ConnectionResetError) as e:
         print(f"連線錯誤: {e}")
         return False

@@ -141,27 +141,34 @@ def receive_data(client_socket):
     """接收完整的資料並處理黏包問題"""
     try:
         data = ''
-        while True:
-            try:
-                chunk = client_socket.recv(4096).decode('utf-8')
-                if not chunk:
-                    break
+        try:
+            chunk = client_socket.recv(4096).decode('utf-8')
+            if chunk:
                 data += chunk
-            except BlockingIOError:
-                break
-                
+        except BlockingIOError:
+            pass
+                 
         if data:
+            # 取最後一個完整的訊息
             messages = data.split('\n')
-            for message in messages:
-                if message.strip():  # 確保訊息不是空的
-                    try:
-                        decoded_data = json.loads(message)
-                        if 'plants' in decoded_data:  # 確認有植物資料
-                            print(f"接收到植物資料: {len(decoded_data['plants'])} 個")
-                            return decoded_data
-                    except json.JSONDecodeError:
-                        continue
-                        
+            if len(messages) > 1:
+                last_complete_message = messages[-2]  # -2 是因為最後一個可能不完整
+                try:
+                    decoded_data = json.loads(last_complete_message)
+                    # 改成印出更詳細的資料
+                    if 'plants' in decoded_data:
+                        plants = decoded_data['plants']
+                        print(f"===== 接收到的植物資料 =====")
+                        print(f"植物總數: {len(plants)}")
+                        for i, plant in enumerate(plants):
+                            print(f"植物 {i+1}:")
+                            print(f"  類型: {plant.get('type')}")
+                            print(f"  位置: ({plant.get('x')}, {plant.get('y')})")
+                            print(f"  血量: {plant.get('hp')}")
+                        return decoded_data
+                except json.JSONDecodeError as e:
+                    print(f"JSON 解析錯誤: {e}")
+                    
     except Exception as e:
         print(f"接收資料時發生錯誤: {str(e)}")
         
@@ -212,9 +219,13 @@ def main():
             try:
                 new_state = receive_data(client_socket)
                 if new_state:
-                    print("[ZOMBIE] 收到遊戲狀態更新:")  # 除錯用
-                    print(f"植物數量: {len(new_state.get('plants', []))}")  # 除錯用
-                    game_state = new_state
+                    # 確保有收到新狀態才更新
+                    if new_state != game_state:  # 狀態有變化才印出
+                        print(f"[ZOMBIE] 更新遊戲狀態:")
+                        print(f"植物數量: {len(new_state.get('plants', []))}")
+                        print(f"殭屍數量: {len(new_state.get('active_zombies', []))}")
+                        print(f"子彈數量: {len(new_state.get('bullets', []))}")
+                        game_state = new_state
             except Exception as e:
                 print(f"更新遊戲狀態時發生錯誤: {str(e)}")
 
@@ -222,14 +233,23 @@ def main():
             screen.fill((255, 255, 255))
             draw_map(screen)
             
-            # 繪製植物（加入更多除錯訊息）
-            print("開始繪製植物...")  # 除錯用
+            # 繪製植物
             for plant in game_state.get('plants', []):
-                print(f"繪製植物: 類型={plant.get('type')}, x={plant.get('x')}, y={plant.get('y')}")  # 除錯用
-                if plant.get('hp', 0) > 0:
-                    plant_image = sunflower_image if plant['type'] == 'sunflower' else peashooter_image
-                    screen.blit(plant_image, (plant['x'], plant['y']))
-    
+                if plant and isinstance(plant, dict):
+                    plant_type = plant.get('type')
+                    x = plant.get('x')
+                    y = plant.get('y')
+                    hp = plant.get('hp', 0)
+                    
+                    if hp > 0 and x is not None and y is not None:
+                        try:
+                            # 選擇正確的圖片
+                            plant_image = sunflower_image if plant_type == 'sunflower' else peashooter_image
+                            screen.blit(plant_image, (x, y))
+                            print(f"成功繪製植物: {plant_type} at ({x}, {y})")
+                        except Exception as e:
+                            print(f"繪製植物時發生錯誤: {e}")
+
             # 繪製子彈
             for bullet in game_state.get('bullets', []):
                 if bullet.get('live', False):
