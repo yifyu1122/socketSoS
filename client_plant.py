@@ -105,12 +105,15 @@ class Sunflower(Plant):
         self.time_count = 0
 
     def produce_money(self):
-        self.time_count += 1
+        if self.hp > 0 :
+            self.time_count += 1
+        if self.hp <= 0 :
+            self.time_count = 0
         if self.time_count == 25:  # 每25個時間單位產生金錢
             self.time_count = 0
             return 5  # 產生5塊錢
-        return 0
-
+        else:
+            return 0
 class PeaShooter(Plant):
     def __init__(self, x, y):
         super().__init__()
@@ -342,10 +345,12 @@ def main():
 
         # 向日葵產生金錢
         for sunflower in sunflowers:
-            earned_money = sunflower.produce_money()
+            earned_money = 0
+            if sunflower.hp > 0:  # Only produce money if sunflower is alive
+                earned_money = sunflower.produce_money() 
             if earned_money > 0:
                 money += earned_money
-                print(f"向日葵產生了 {earned_money} 元")
+                print(f"hp={sunflower.hp},向日葵產生了 {earned_money} 元")
 
         try:
             # 接收服務器更新
@@ -356,10 +361,15 @@ def main():
                 
                 # 更新植物資料
                 plants.clear()
-                for plant_data in new_state.get('plants', []):
-                    plants.append(plant_data)
-                        
-                
+                for plant in new_state.get('plants', []):
+                    plants.append(plant)
+                    if(plant.get("type") == 'sunflower'):
+                        # Find the corresponding sunflower and update its hp
+                        for sunflower in sunflowers:
+                            if sunflower.rect.x == plant['x'] and sunflower.rect.y == plant['y']:
+                                sunflower.hp = plant['hp']
+                                break
+
                 # 更新殭屍位置
                 zombies.clear()  # 清空舊的殭屍列表
                 for zombie_data in new_state.get('active_zombies', []):
@@ -414,9 +424,11 @@ def main():
         # 繪製 UI
         font = pygame.font.SysFont('arial', 24)
         money_text = font.render(f'Money: ${money}', True, (0, 0, 0))
-        help_text = font.render('Left click: Sunflower ($50)  Middle click: Wallnut ($50)  Right click: Peashooter ($50)', True, (0, 0, 0))
+        help_text = font.render('Left click: Sunflower ($50)  Middle click: Wallnut ($50)', True, (0, 0, 0))
+        help_text2 = font.render('Right click: Peashooter ($50)',True,(0,0,0))
         screen.blit(money_text, (10, 10))
         screen.blit(help_text, (250, 10))
+        screen.blit(help_text2,(250, 40))
 
         pygame.display.flip()
         clock.tick(FPS)

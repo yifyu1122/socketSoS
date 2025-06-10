@@ -114,7 +114,7 @@ class GameServer:
         # 清理死亡的物件
         self.game_state['active_zombies'] = [z for z in self.game_state['active_zombies'] if z['live']]
         self.game_state['bullets'] = [b for b in self.game_state['bullets'] if b['live']]
-        self.game_state['plants'] = [p for p in self.game_state['plants'] if p.get('hp', 0) > 0]
+        #self.game_state['plants'] = [p for p in self.game_state['plants'] if p.get('hp', 0) > 0]
 
     def handle_client(self, client_socket, addr):
         """處理客戶端連接"""
