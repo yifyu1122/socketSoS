@@ -27,7 +27,7 @@ sunflower_image = pygame.image.load('imgs/sunflower.png')
 peashooter_image = pygame.image.load('imgs/peashooter.png')
 zombie_image = pygame.image.load('imgs/zombie.png')
 peabullet_image = pygame.image.load('imgs/peabullet.png')
-wallnut_image = pygame.image.load('imgs/wallnut.png')
+wallnut_image = pygame.image.load('imgs/wallnut2.png')
 
 class Zombie:
     def __init__(self, x, y):
@@ -291,7 +291,30 @@ def main():
                                     print("無法重新連接到伺服器")
                                     running = False
                                     break
-                                    
+                        elif event.button == 2:     #石頭人
+                            plant_data = {
+                                'type': 'wallnut',
+                                'x': x * 80,
+                                'y': y * 80,
+                                'hp': 1000
+                            }
+                            if send_plant_placement(x * 80, y * 80, 'wallnut'):
+                                plants.append(plant_data)
+                                map.can_grow = False
+                                money -= 50
+                            else:
+                                # 如果發送失敗，嘗試重新連接
+                                if reconnect():
+                                    # 重新發送
+                                    if send_plant_placement(x * 80, y * 80, 'wallnut'):
+                                        plants.append(plant_data)
+                                        map.can_grow = False
+                                        money -= 50
+                                else:
+                                    print("無法重新連接到伺服器")
+                                    running = False
+                                    break
+                            
                         elif event.button == 3:  # 右鍵放豌豆射手
                             peashooter_data =({
                                 'type': 'peashooter',
@@ -377,9 +400,11 @@ def main():
             if plant.get('hp', 0) > 0:
                 if plant['type'] == 'sunflower':
                     screen.blit(sunflower_image, (plant['x'], plant['y']))
-                else:
+                elif plant['type'] == 'peashooter':
                     screen.blit(peashooter_image, (plant['x'], plant['y']))
-        
+                elif plant['type'] == 'wallnut':
+                    screen.blit(wallnut_image, (plant['x'], plant['y']))
+                 
         # 繪製子彈
         for bullet in new_state.get('bullets', []):
             if bullet.get('live', False):
@@ -389,7 +414,7 @@ def main():
         # 繪製 UI
         font = pygame.font.SysFont('arial', 24)
         money_text = font.render(f'Money: ${money}', True, (0, 0, 0))
-        help_text = font.render('Left click: Sunflower ($50)    Right click: Peashooter ($50)', True, (0, 0, 0))
+        help_text = font.render('Left click: Sunflower ($50)  Middle click: Wallnut ($50)  Right click: Peashooter ($50)', True, (0, 0, 0))
         screen.blit(money_text, (10, 10))
         screen.blit(help_text, (250, 10))
 
