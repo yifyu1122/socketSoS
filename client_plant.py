@@ -27,6 +27,7 @@ sunflower_image = pygame.image.load('imgs/sunflower.png')
 peashooter_image = pygame.image.load('imgs/peashooter.png')
 zombie_image = pygame.image.load('imgs/zombie.png')
 peabullet_image = pygame.image.load('imgs/peabullet.png')
+wallnut_image = pygame.image.load('imgs/wallnut.png')
 
 class Zombie:
     def __init__(self, x, y):
@@ -153,6 +154,17 @@ class PeaBullet:
     def draw(self, screen):
         if self.live:
             screen.blit(self.image, self.rect)
+
+class Wallnut(Plant):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = wallnut_image
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.price = 50
+        self.hp = 2000
+        self.shot_count = 0  # 射擊計時器
 
 def init_map():
     map_list = []
@@ -281,16 +293,29 @@ def main():
                                     break
                                     
                         elif event.button == 3:  # 右鍵放豌豆射手
-                            peashooter = PeaShooter(x * 80, y * 80)
-                            plants.append({
+                            peashooter_data =({
                                 'type': 'peashooter',
                                 'x': x * 80,
                                 'y': y * 80,
                                 'hp': 200
                             })
-                            map.can_grow = False
-                            money -= 50
-                            send_plant_placement(x * 80, y * 80, 'peashooter')
+                            
+                            if send_plant_placement(x * 80, y * 80, 'peashooter'):
+                                plants.append(peashooter_data)
+                                map.can_grow = False
+                                money -= 50
+                            else:
+                                # 如果發送失敗，嘗試重新連接
+                                if reconnect():
+                                    # 重新發送
+                                    if send_plant_placement(x * 80, y * 80, 'peashooter'):
+                                        plants.append(peashooter_data)
+                                        map.can_grow = False
+                                        money -= 50
+                                else:
+                                    print("無法重新連接到伺服器")
+                                    running = False
+                                    break
 
         # 向日葵產生金錢
         for sunflower in sunflowers:
@@ -305,6 +330,12 @@ def main():
             received_state = receive_game_state(client_socket)
             if received_state:
                 new_state = received_state
+                
+                # 更新植物資料
+                plants.clear()
+                for plant_data in new_state.get('plants', []):
+                    plants.append(plant_data)
+                        
                 
                 # 更新殭屍位置
                 zombies.clear()  # 清空舊的殭屍列表

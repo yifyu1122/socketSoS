@@ -235,7 +235,7 @@ def main():
             
             # 繪製植物
             for plant in game_state.get('plants', []):
-                if plant and isinstance(plant, dict):
+                if plant and isinstance(plant, dict) and plant.get('hp', 0) > 0:
                     plant_type = plant.get('type')
                     x = plant.get('x')
                     y = plant.get('y')

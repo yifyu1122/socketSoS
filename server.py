@@ -95,17 +95,20 @@ class GameServer:
 
         # 更新殭屍
         for zombie in self.game_state['active_zombies']:
-            if zombie['live'] and not zombie.get('stop', False):
-                zombie['x'] -= self.update_rate
+            if zombie['live'] :
+                if not zombie.get('stop', False) : #如果不是stop 則繼續移動
+                    zombie['x'] -= self.update_rate
                 # 檢查是否碰到植物
                 for plant in self.game_state['plants']:
                     if (plant.get('hp', 0) > 0 and 
                         abs(zombie['x'] - plant['x']) < 40 and 
                         zombie['y'] == plant['y']):
                         zombie['stop'] = True
-                        plant['hp'] -= 2  # 殭屍攻擊植物
+                        plant['hp'] -= 1  # 殭屍攻擊植物
                         break
-                
+                    else: 
+                        zombie['stop'] = False
+                        break
                 if zombie['x'] < -80:
                     zombie['live'] = False
 
