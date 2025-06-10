@@ -34,15 +34,20 @@ class GameServer:
 
     def handle_zombie_placement(self, message):
         """處理殭屍放置"""
+        grid_y = message['position'][1]
         zombie = {
             'x': self.SCREEN_WIDTH,
-            'y': message['position'][1] * 80,
+            'y': grid_y * 80,
+            'grid_y': grid_y,
             'hp': 1000,
             'live': True,
             'stop': False
         }
         self.game_state['active_zombies'].append(zombie)
+        print(f"[SERVER] 新增殭屍: {zombie}")  # 除錯訊息
+        print(f"[SERVER] 目前總殭屍數: {len(self.game_state['active_zombies'])}")  # 除錯訊息
         self.broadcast_game_state()
+
 
     def handle_plant_placement(self, message):
         """處理植物放置"""
@@ -110,33 +115,41 @@ class GameServer:
         self.game_state['plants'] = [p for p in self.game_state['plants'] if p.get('hp', 0) > 0]
 
     def handle_client(self, client_socket, addr):
+        """處理客戶端連接"""
         try:
             client_type = client_socket.recv(1024).decode('utf-8')
             self.clients[client_socket] = client_type
             print(f'新的 {client_type} 客戶端已連接: {addr}')
-            self.broadcast_game_state()
-
+            
+            buffer = ""
             while True:
                 try:
-                    data = client_socket.recv(1024)
+                    data = client_socket.recv(1024).decode('utf-8')
                     if not data:
                         break
                     
-                    message = json.loads(data.decode('utf-8'))
+                    buffer += data
                     
-                    # 根據動作類型處理
-                    if message['action'] == 'place_zombie':
-                        self.handle_zombie_placement(message)
-                    elif message['action'] == 'place_plant':
-                        self.handle_plant_placement(message)
-                    elif message['action'] == 'create_bullet':
-                        self.handle_bullet_creation(message)
-
-                except json.JSONDecodeError:
-                    print(f"收到無效的 JSON 資料從 {addr}")
+                    # 處理可能的多條訊息
+                    while '\n' in buffer:
+                        message, buffer = buffer.split('\n', 1)
+                        try:
+                            decoded_message = json.loads(message)
+                            # 根據動作類型處理
+                            if decoded_message['action'] == 'place_zombie':
+                                self.handle_zombie_placement(decoded_message)
+                            elif decoded_message['action'] == 'place_plant':
+                                self.handle_plant_placement(decoded_message)
+                            elif decoded_message['action'] == 'create_bullet':
+                                self.handle_bullet_creation(decoded_message)
+                        except json.JSONDecodeError:
+                            print(f"收到無效的 JSON 資料：{message}")
+                            continue
+                    
                 except Exception as e:
                     print(f"處理客戶端 {addr} 資料時發生錯誤: {str(e)}")
                     break
+                
         finally:
             client_socket.close()
             if client_socket in self.clients:
@@ -146,14 +159,52 @@ class GameServer:
     def broadcast_game_state(self):
         """廣播遊戲狀態給所有客戶端"""
         try:
-            state_json = json.dumps(self.game_state) + '\n'
+            # 製作完整的遊戲狀態
+            current_state = {
+                'plants': [
+                    {
+                        'type': plant['type'],
+                        'x': plant['x'],
+                        'y': plant['y'],
+                        'hp': plant['hp']
+                    } for plant in self.game_state['plants']
+                ],
+                'active_zombies': [
+                    {
+                        'x': zombie['x'],
+                        'y': zombie['y'],
+                        'hp': zombie['hp'],
+                        'live': zombie['live'],
+                        'stop': zombie.get('stop', False)
+                    } for zombie in self.game_state['active_zombies']
+                    if zombie['live']
+                ],
+                'bullets': [
+                    {
+                        'x': bullet['x'],
+                        'y': bullet['y'],
+                        'live': bullet['live']
+                    } for bullet in self.game_state['bullets']
+                    if bullet['live']
+                ]
+            }
+
+            # 轉換成 JSON 並加上換行符
+            state_json = json.dumps(current_state) + '\n'
             encoded_data = state_json.encode('utf-8')
-            for client in list(self.clients.keys()):  # 使用列表複製避免字典在迭代時被修改
+            print(f"[SERVER] 廣播遊戲狀態: {len(current_state['plants'])} 植物, "
+                  f"{len(current_state['active_zombies'])} 殭屍, "
+                  f"{len(current_state['bullets'])} 子彈")
+
+            # 廣播給所有客戶端
+            for client in list(self.clients.keys()):
                 try:
                     client.sendall(encoded_data)
-                except:
+                except Exception as e:
+                    print(f"廣播到客戶端失敗: {str(e)}")
                     if client in self.clients:
                         del self.clients[client]
+                        
         except Exception as e:
             print(f"廣播遊戲狀態時發生錯誤: {str(e)}")
 

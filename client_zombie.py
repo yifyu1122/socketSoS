@@ -140,22 +140,32 @@ def reconnect():
 def receive_data(client_socket):
     """接收完整的資料並處理黏包問題"""
     try:
-        data = b''
+        data = ''
         while True:
-            chunk = client_socket.recv(1024)
-            if not chunk:
-                break
-            data += chunk
             try:
-                # 嘗試將接收到的資料解析為 JSON
-                return json.loads(data.decode('utf-8').strip())
-            except json.JSONDecodeError:
-                continue  # 如果解析失敗，繼續接收資料
-    except BlockingIOError:
-        return None
+                chunk = client_socket.recv(4096).decode('utf-8')
+                if not chunk:
+                    break
+                data += chunk
+            except BlockingIOError:
+                break
+                
+        if data:
+            messages = data.split('\n')
+            for message in messages:
+                if message.strip():  # 確保訊息不是空的
+                    try:
+                        decoded_data = json.loads(message)
+                        if 'plants' in decoded_data:  # 確認有植物資料
+                            print(f"接收到植物資料: {len(decoded_data['plants'])} 個")
+                            return decoded_data
+                    except json.JSONDecodeError:
+                        continue
+                        
     except Exception as e:
         print(f"接收資料時發生錯誤: {str(e)}")
-        return None
+        
+    return None
 
 def main():
     clock = pygame.time.Clock()
@@ -202,29 +212,24 @@ def main():
             try:
                 new_state = receive_data(client_socket)
                 if new_state:
+                    print("[ZOMBIE] 收到遊戲狀態更新:")  # 除錯用
+                    print(f"植物數量: {len(new_state.get('plants', []))}")  # 除錯用
                     game_state = new_state
-            except (ConnectionAbortedError, ConnectionResetError):
-                if current_time - reconnect_cooldown > 5:
-                    print("連接中斷，嘗試重新連接...")
-                    new_socket = reconnect()
-                    if new_socket:
-                        client_socket = new_socket
-                        reconnect_cooldown = current_time
             except Exception as e:
                 print(f"更新遊戲狀態時發生錯誤: {str(e)}")
-                
+
             # 更新畫面
             screen.fill((255, 255, 255))
             draw_map(screen)
             
-            # 繪製植物
+            # 繪製植物（加入更多除錯訊息）
+            print("開始繪製植物...")  # 除錯用
             for plant in game_state.get('plants', []):
+                print(f"繪製植物: 類型={plant.get('type')}, x={plant.get('x')}, y={plant.get('y')}")  # 除錯用
                 if plant.get('hp', 0) > 0:
-                    if plant['type'] == 'sunflower':
-                        screen.blit(sunflower_image, (plant['x'], plant['y']))
-                    else:
-                        screen.blit(peashooter_image, (plant['x'], plant['y']))
-            
+                    plant_image = sunflower_image if plant['type'] == 'sunflower' else peashooter_image
+                    screen.blit(plant_image, (plant['x'], plant['y']))
+    
             # 繪製子彈
             for bullet in game_state.get('bullets', []):
                 if bullet.get('live', False):
@@ -234,7 +239,7 @@ def main():
             for zombie in game_state.get('active_zombies', []):
                 if zombie.get('live', False):
                     screen.blit(zombie_image, (zombie['x'], zombie['y']))
-            
+
             # 顯示說明文字
             font = pygame.font.SysFont('arial', 24)
             help_text = font.render('Click grid to place zombie', True, (0, 0, 0))
